@@ -1,13 +1,22 @@
 const mysql = require('mysql2')
 const inquirer = require('inquirer');
-const { response } = require('express');
+const {res} = require('express');
 
 const database = mysql.createConnection({
     host: "localhost",
-    port: 3001,
+    port: 3306,
     user: "root",
     password: "Vash@12349",
     database: "employee_db"
+});
+
+database.connect(function (err) {
+    if (err) {
+        console.error("Error connecting to MySQL:", err);
+        return;
+    }
+    console.log("MySQL Connected");
+    start();
 });
 
 function start() {
@@ -27,29 +36,29 @@ function start() {
                 "Exit"
             ]
         }
-    ]).then(response => {
-        if (response.choice === "View all employees") {
+    ]).then(res => {
+        if (res.choice === "View all employees") {
             viewEmployees()
         }
-        else if (response.choice === "View all departments") {
+        else if (res.choice === "View all departments") {
             viewDepartments()
         }
-        else if (response.choice === "View all roles") {
+        else if (res.choice === "View all roles") {
             viewRoles()
         }
-        else if (response.choice === "Add a department") {
+        else if (res.choice === "Add a department") {
             addDepartment()
         }
-        else if (response.choice === "Add a role") {
+        else if (res.choice === "Add a role") {
             addRole()
         }
-        else if (response.choice === "Add an employee") {
+        else if (res.choice === "Add an employee") {
             addEmployee()
         }
-        else if (response.choice === "Update an employee role") {
+        else if (res.choice === "Update an employee role") {
             updateRole()
         }
-        else if (response.choice === "Exit") {
+        else if (res.choice === "Exit") {
             console.log("Exited")
         }
     })
@@ -58,7 +67,7 @@ function start() {
 function viewEmployees() {
     database.query("SELECT * FROM employee", function (err, res) {
         if (err) throw err;
-        console.log(res);
+        console.table(res);
         start();
     });
 }
