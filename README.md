@@ -6,3 +6,4 @@ Users download the application to their computer to create tables for organizing
 
 ## Walkthrough
 
+https://drive.google.com/file/d/1gX-0aor6JZj6l0wbKL4_XSKb6XngQj2G/view 
