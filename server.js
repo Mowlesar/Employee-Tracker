@@ -1,6 +1,6 @@
 const mysql = require('mysql2')
 const inquirer = require('inquirer');
-const {res} = require('express');
+
 
 const database = mysql.createConnection({
     host: "localhost",
@@ -75,7 +75,7 @@ function viewEmployees() {
 function viewDepartments() {
     database.query("SELECT * FROM department", function (err, res) {
         if (err) throw err;
-        console.log(res);
+        console.table(res);
         start();
     });
 }
@@ -83,8 +83,35 @@ function viewDepartments() {
 function viewRoles() {
     database.query("SELECT * FROM role", function (err, res) {
         if (err) throw err;
-        console.log(res);
+        console.table(res);
         start();
+    });
+}
+
+function addDepartment() {
+    inquirer.prompt([
+        {
+            type: "input",
+            name: "newDepartment",
+            message: "Please enter the name of the new department."
+        }
+    ]).then(answers => {
+        // Insert the new department into the database
+        const newDepartmentName = answers.newDepartment; // Store the department name in a separate variable
+
+        database.query(
+            'INSERT INTO department (department_name) VALUES (?)',
+            [newDepartmentName],
+            (err, result) => {
+                if (err) {
+                    console.error('Error adding department:', err);
+                } else {
+                    console.log(`Successfully added department: ${newDepartmentName}`);
+                }
+                // Return to the start menu
+                start();
+            }
+        );
     });
 }
 
@@ -117,7 +144,7 @@ function addRole() {
                 } else {
                     const departmentId = results[0].id;
                     database.query(
-                        'INSERT INTO roles SET ?',
+                        'INSERT INTO role SET ?',
                         {
                             title: res.newRole,
                             salary: res.salary,
@@ -150,60 +177,29 @@ function addEmployee() {
             },
             {
                 type: 'input',
-                name: 'employeeRole',
+                name: 'employeeRoleId',
                 message: "What is the employee's role id?"
             },
             {
                 type: 'input',
-                name: 'manager',
+                name: 'managerId',
                 message: "What is the employee's manager id?"
             },
-        ])
-        .then(res => {
-            const { firstName, lastName, employeeRole, manager } = res;
-
-            // Check if the entered role and manager IDs exist in the database
-            db.query(
-                "SELECT COUNT(*) AS roleCount FROM role WHERE id = ?; SELECT COUNT(*) AS employeeCount FROM employee WHERE id = ?",
-                [employeeRole, manager],
-                (checkErr, checkResults) => {
-                    if (checkErr) {
-                        console.error("Error checking role and manager IDs:", checkErr);
-                        start();
-                        return;
-                    }
-
-                    const roleCount = checkResults[0][0].roleCount;
-                    const employeeCount = checkResults[1][0].employeeCount;
-
-                    if (roleCount === 0 || employeeCount === 0) {
-                        console.log("Role or Manager ID not found in the database.");
-                        start();
-                        return;
-                    }
-
-                    // If everything is valid, perform the insertion
-                    db.query(
-                        `INSERT INTO employee SET ?`,
-                        {
-                            first_name: firstName,
-                            last_name: lastName,
-                            role_id: employeeRole,
-                            manager_id: manager
-                        },
-                        (err, result) => {
-                            if (err) {
-                                console.error("Error adding employee:", err);
-                            } else {
-                                console.log(`Added ${firstName} ${lastName} to the database`);
-                            }
-                            start();
-                        }
-                    );
-                }
-            );
+        ]).then(res => {
+            const query = `INSERT INTO employee SET ?`
+            database.query(
+                query, {
+                first_name: res.firstName,
+                last_name: res.lastName,
+                role_id: res.employeeRoleId,
+                manager_id: res.managerId
+            }
+            )
+            console.log(`Added ${res.firstName} ${res.lastName} to the database`);
+            start();
         });
 }
+
 
 function updateRole() {
     inquirer
@@ -219,43 +215,55 @@ function updateRole() {
                 message: "Enter the new role ID for the employee:",
             },
         ])
-        .then(res => {
+        .then((res) => {
             const { employeeId, newRole } = res;
 
-            // Check if the entered employee ID and new role ID exist in the database
-            db.query(
-                "SELECT COUNT(*) AS employeeCount FROM employee WHERE id = ?; SELECT COUNT(*) AS roleCount FROM role WHERE id = ?",
-                [employeeId, newRole],
-                (checkErr, checkResults) => {
-                    if (checkErr) {
-                        console.error("Error checking employee and role IDs:", checkErr);
+            // Check if the entered employee ID exists in the database
+            const employeeCountQuery = "SELECT COUNT(*) AS employeeCount FROM employee WHERE id = ?";
+            database.query(employeeCountQuery, [employeeId], (employeeCountErr, employeeCountResults) => {
+                if (employeeCountErr) {
+                    console.error("Error checking employee ID:", employeeCountErr);
+                    start();
+                    return;
+                }
+
+                const employeeCount = employeeCountResults[0].employeeCount;
+
+                if (employeeCount === 0) {
+                    console.log("Employee ID not found in the database.");
+                    start();
+                    return;
+                }
+
+                // Check if the entered role ID exists in the database
+                const roleCountQuery = "SELECT COUNT(*) AS roleCount FROM role WHERE id = ?";
+                database.query(roleCountQuery, [newRole], (roleCountErr, roleCountResults) => {
+                    if (roleCountErr) {
+                        console.error("Error checking role ID:", roleCountErr);
                         start();
                         return;
                     }
 
-                    const employeeCount = checkResults[0][0].employeeCount;
-                    const roleCount = checkResults[1][0].roleCount;
+                    const roleCount = roleCountResults[0].roleCount;
 
-                    if (employeeCount === 0 || roleCount === 0) {
-                        console.log("Employee or Role ID not found in the database.");
+                    if (roleCount === 0) {
+                        console.log("Role ID not found in the database.");
                         start();
                         return;
                     }
 
                     // Update the employee's role
-                    db.query(
-                        "UPDATE employee SET role_id = ? WHERE id = ?",
-                        [newRole, employeeId],
-                        (updateErr, updateResult) => {
-                            if (updateErr) {
-                                console.error("Error updating employee role:", updateErr);
-                            } else {
-                                console.log(`Updated role for employee with ID ${employeeId}`);
-                            }
-                            start();
+                    const updateQuery = "UPDATE employee SET role_id = ? WHERE id = ?";
+                    database.query(updateQuery, [newRole, employeeId], (updateErr, updateResult) => {
+                        if (updateErr) {
+                            console.error("Error updating employee role:", updateErr);
+                        } else {
+                            console.log(`Updated role for employee with ID ${employeeId}`);
                         }
-                    );
-                }
-            );
+                        start();
+                    });
+                });
+            });
         });
 }
+
